@@ -1,151 +1,158 @@
 { config, pkgs, ... }:
 
-let
-  # Paquetes de Python
-  my-python-packages = ps: with ps; [
-    tkinter
-    datetime
-    networkx
-  ];
-in
 {
-  # Versión del sistema
+  # System
   system.stateVersion = "23.05";
 
-  # Configuración del sistema y hardware
-  imports = [ ./hardware-configuration.nix ];
-  hardware.opengl.driSupport32Bit = true;
-  nixpkgs.config.allowUnfree = true;
-  nixpkgs.config.multilib.enable = true;
-
-  # Networking
-  networking = {
-    hostName = "desk-joshieadalid";
-    networkmanager.enable = true;
-    firewall.enable = false;
-  };
-
-  # Swap
-  swapDevices = [{
-    device = "/var/lib/swapfile";
-    size = 16 * 1024;
-  }];
-
   # Boot
-  boot.kernelPackages = pkgs.linuxPackages_xanmod_latest;
   boot.loader = {
     systemd-boot.enable = true;
     efi.canTouchEfiVariables = true;
   };
 
-  # Zona horaria
-  time.timeZone = "America/Mexico_City";
+  # Hardware Configuration
+  hardware = {
+    firmware = [ pkgs.linux-firmware ];
+    bluetooth = {
+      enable = true;
+      powerOnBoot = true;
+      package = pkgs.bluez;
+    };
+    opengl = {
+      enable = true;
+      driSupport32Bit = true;
+      extraPackages = [ pkgs.mesa.drivers];
+    };
+  };
 
-  # Usuarios
+  # Services
+  services = {
+    teamviewer.enable = true;
+    dnscrypt-proxy2 = {
+      enable = true;
+      settings = {
+        ipv6_servers = true;
+        require_dnssec = true;
+        sources.public-resolvers = {
+          urls = [
+            "https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/public-resolvers.md"
+            "https://download.dnscrypt.info/resolvers-list/v3/public-resolvers.md"
+          ];
+          cache_file = "/var/lib/dnscrypt-proxy2/public-resolvers.md";
+          minisign_key = "RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3";
+        };
+        server_names = ["cloudflare" "google"];
+      };
+    };
+    gvfs.enable = true; # Mount, trash, and other functionalities
+    pipewire = {
+      enable = true;
+      alsa = {
+        enable = true;
+        support32Bit = true;
+      };
+      pulse.enable = true;
+    };
+    flatpak.enable = true;
+    dbus.enable = true;
+   
+    blueman.enable = true;
+  };
+
+ xdg.portal = {
+      enable = true;
+      wlr.enable = true;
+      extraPortals = [pkgs.xdg-desktop-portal-gtk];
+    };
+
+  # Networking
+  networking = {
+    firewall.enable = false;
+    networkmanager.enable = true;
+    hostName = "latitude"; # Define your hostname.
+    nameservers = [ "127.0.0.1" "::1" ];
+    dhcpcd.extraConfig = "nohook resolv.conf";
+    networkmanager.dns = "none";
+  };
+
+  systemd.services.dnscrypt-proxy2.serviceConfig = {
+    StateDirectory = "dnscrypt-proxy";
+  };
+
+  time.timeZone = "America/Mexico_City";
+  # User management
   users.extraUsers.joshieadalid = {
-    hashedPassword = "$6$UodnzAaZlHThexmm$kQcvK7x1ZmzrKWdPCPYRQktQii3kWR.v2bff0rqg7yjBGGTHMT2BsOieB3rznO5uFsJyTfjyBbHlOmR3/DtZ11"; # Aquí he omitido la contraseña por seguridad
+    hashedPassword = "$6$UodnzAaZlHThexmm$kQcvK7x1ZmzrKWdPCPYRQktQii3kWR.v2bff0rqg7yjBGGTHMT2BsOieB3rznO5uFsJyTfjyBbHlOmR3/DtZ11";
     isNormalUser = true;
     extraGroups = [ "wheel" ];
     packages = with pkgs; [
-      python311Packages.tabulate
-      firefox
-      tree
-      neofetch
-      jetbrains.pycharm-professional
-      google-chrome
-      android-tools
     ];
   };
 
-  # Internacionalización
+  # Internationalisation
   i18n = {
     defaultLocale = "es_MX.UTF-8";
     supportedLocales = [ "en_US.UTF-8/UTF-8" "es_MX.UTF-8/UTF-8" ];
   };
+  
+  console = {
+    keyMap = "es";
+  };
 
-  # Console
-  console.keyMap = "es";
+  environment.pathsToLink = [ "/libexec" ]; # links /libexec from derivations to /run/current-system/sw 
 
-  # Servicio de Xserver
   services.xserver = {
     enable = true;
-    windowManager.i3.enable = true;
-    displayManager = {
-      defaultSession = "none+i3";
-      lightdm.enable = true;
-    };
+    layout = "es";
+    xkbOptions = "eurosign:e";
+    desktopManager.mate.enable = true;
+    displayManager.lightdm.enable = true;
     videoDrivers = [ "intel" ];
   };
 
-  # Otros programas y servicios
+
+  # Packages
+  nixpkgs.config.allowUnfree = true;
+  environment.systemPackages = with pkgs; [
+    networkmanagerapplet
+    virt-manager
+    xdg-utils
+    glib
+    mate.mate-system-monitor
+  ];
+
+  # Fonts
+  fonts.packages = with pkgs; [jetbrains-mono inconsolata];
+  
+  # Misc
+  imports = [./hardware-configuration.nix]; 
+  nixpkgs.config.multilib.enable = true;
+  
+  # Virtualización
+  virtualisation.libvirtd.enable = true;
+  programs.dconf.enable = true;
+  
+  nix.optimise.automatic = true;
+
   programs.steam = {
-    enable = true;
-    remotePlay.openFirewall = true;
     dedicatedServer.openFirewall = true;
   };
-  programs.java.enable = true;
-  services.flatpak.enable = true;
-  services.pipewire = {
-    enable = true;
-    alsa = {
-      enable = true;
-      support32Bit = true;
-    };
-    pulse.enable = true;
+  
+  security.polkit.enable = true;
+  users.users.joshieadalid.extraGroups = [ "video" ];
+  programs.light.enable = true;
+
+  
+  
+  services.postgresql = {
+  enable = true;
+  authentication = pkgs.lib.mkOverride 10 ''
+    # TYPE  DATABASE        USER            ADDRESS                 METHOD
+    local   all             all                                     peer
+    host    all             all             127.0.0.1/32            md5
+    host    all             all             ::1/128                 md5
+  '';
   };
-  security.rtkit.enable = true;
-  xdg.portal = {
-    enable = true;
-    extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
-  };
 
-  # Overlays
-  nixpkgs.overlays = [
-    (final: prev: {
-      steam = prev.steam.override ({ extraPkgs ? pkgs': [], ... }: {
-        extraPkgs = pkgs': (extraPkgs pkgs') ++ (with pkgs'; [
-          libgdiplus
-        ]);
-      });
-    })
-  ];
 
-  # Paquetes del sistema
-  environment.systemPackages = with pkgs; [
-    flatpak-builder
-    (vscode-with-extensions.override {
-      vscodeExtensions = with vscode-extensions; [
-        bbenoist.nix
-        ms-python.python
-        ms-azuretools.vscode-docker
-        ms-vscode-remote.remote-ssh
-      ] ++ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
-        {
-          name = "remote-ssh-edit";
-          publisher = "ms-vscode-remote";
-          version = "0.47.2";
-          sha256 = "1hp6gjh4xp2m1xlm1jsdzxw9d8frkiidhph6nvl24d0h8z34w49g";
-        }
-      ];
-    })
-    (steam.override {
-      extraPkgs = pkgs: [ bumblebee glxinfo ];
-    }).run
-    (python3.withPackages my-python-packages)
-    tk
-    dotnet-runtime
-    vim
-    wget
-    pavucontrol
-    pulseaudio
-    udiskie
-    networkmanagerapplet
-    dmenu
-    alacritty
-    i3
-    i3status
-  ];
-
-  # Fuentes
-  fonts.fonts = with pkgs; [ jetbrains-mono ];
 }
